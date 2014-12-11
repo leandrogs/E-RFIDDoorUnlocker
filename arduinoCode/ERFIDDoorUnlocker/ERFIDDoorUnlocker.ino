@@ -123,7 +123,7 @@ void setup() {
   Serial.begin(9600);    // Initialize serial communications with PC
   SPI.begin();           // MFRC522 Hardware uses SPI protocol
   mfrc522.PCD_Init();    // Initialize MFRC522 Hardware
-  mfrc522.PCD_SetAntennaGain(mfroc522.RxGain_max); //Set Antenna Gain to Max- this will increase reading distance
+  mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max); //Set Antenna Gain to Max- this will increase reading distance
 
   Ethernet.begin(mac,ip); // Connect the server
 
@@ -404,6 +404,7 @@ void cycleLeds() {
   digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
   digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
   delay(200);
+  digitalWrite(redLed, LED_OFF);
 }
 
 void cardReaded() {
