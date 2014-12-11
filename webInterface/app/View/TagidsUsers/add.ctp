@@ -3,8 +3,10 @@
 	<fieldset>
 		<legend><?php echo __('Add Tagids User'); ?></legend>
 	<?php
-		echo $this->Form->input('tagid_id');
-		echo $this->Form->input('user_id');
+		// echo $this->Form->hidden('tagid', array('value' => 'Tag ID'));
+		// echo $this->Form->hidden('user', array('value' => 'Usuário'));
+		echo $this->Form->input('tagid_id', array('label' => 'Tag ID'));
+		echo $this->Form->input('user_id', array('label' => 'Usuário'));
 	?>
 	</fieldset>
 <?php echo $this->Form->end(__('Submit')); ?>
