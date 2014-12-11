@@ -47,7 +47,7 @@ if(isset($_GET['cod']) && isset($_GET['tag'])){
 				$tagid = $row['tagid_id'];
 				$userid = $row['user_id'];
 
-				$sql = "INSERT INTO `accesslog`
+				$sql = "INSERT INTO `accesslogs`
 				(`tagid_id`, `user_id`, `created`)
 				VALUES ('$tagid', '$userid', NOW())";
 				$result = mysqli_query($con, $sql);				

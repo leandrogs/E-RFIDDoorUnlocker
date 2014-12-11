@@ -8,8 +8,8 @@
 		<li><?php echo $this->Html->link(__('Adicionar Usuário'), array('controller' => 'users' ,'action' => 'add')); ?></li>
 		<li><?php echo $this->Html->link(__('Listar Tags'), array('controller' => 'tagids', 'action' => 'index')); ?> </li>
 		<li><?php echo $this->Html->link(__('Adicionar Tag'), array('controller' => 'tagids' ,'action' => 'add')); ?></li>
-		<li><?php echo $this->Html->link(__('Listar Usuários/Tags'), array('controller' => 'tagidsusers' ,'action' => 'index')); ?></li>
-		<li><?php echo $this->Html->link(__('Associar Usuários/Tag'), array('controller' => 'tagidsusers' ,'action' => 'add')); ?></li>
+		<li><?php echo $this->Html->link(__('Listar Usuários/Tags'), array('controller' => 'tagidsUsers' ,'action' => 'index')); ?></li>
+		<li><?php echo $this->Html->link(__('Associar Usuários/Tag'), array('controller' => 'tagidsUsers' ,'action' => 'add')); ?></li>
 
 	</ul>
 </div>
