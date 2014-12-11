@@ -1,87 +1,55 @@
-/* Arduino RC522 RFID Door Unlocker
- * July/2014 Omer Siar Baysal
- * 
- * Unlocks a Door (controls a relay actually)
- * using a RC522 RFID reader with SPI interface on your Arduino
- * You define a Master Card which is act as Programmer
- * then you can able to choose card holders who able to unlock
- * the door or not.
- * 
- * Easy User Interface
- *
- * Just one RFID tag needed whether Delete or Add Tags
- * You can choose to use Leds for output or
- * Serial LCD module to inform users. Or you can use both
- *
- * Stores Information on EEPROM
- *
- * Information stored on non volatile Arduino's EEPROM 
- * memory to preserve Users' tag and Master Card
- * No Information lost if power lost. 
- * EEPROM has unlimited Read cycle but 100,000 limited Write cycle. 
- * 
- * Security
- * 
- * To keep it simple we are going to use Tag's Unique IDs
- * It's simple, a bit secure, but not hacker proof.
- *
- * MFRC522 Library also lets us to use some authentication
- * mechanism, writing blocks and reading back
- * and there is great example piece of code
- * about reading and writing PICCs
- * here > http://makecourse.weebly.com/week10segment1.html
- *
- * If you rely on heavy security, figure it out how RFID system
- * can be secure yourself (personally very curious about it)
- * 
- * Credits
- *
- * Omer Siar Baysal who put together this project
- *
- * Idea and most of code from Brett Martin's project
- * http://www.instructables.com/id/Arduino-RFID-Door-Lock/
- * www.pcmofo.com
- *
- * MFRC522 Library
- * https://github.com/miguelbalboa/rfid
- * Based on code Dr.Leong   ( WWW.B2CQSHOP.COM )
- * Created by Miguel Balboa (circuitito.com), Jan, 2012.
- * Rewritten by Søren Thing Andersen (access.thing.dk), fall of 2013 
- * (Translation to English, refactored, comments, anti collision, cascade levels.)
- *
- * Arduino Forum Member luisilva for His Massive Code Correction
- * http://forum.arduino.cc/index.php?topic=257036.0
- * http://forum.arduino.cc/index.php?action=profile;u=198897
- *
- * License
- *
- * You are FREE what to do with this code
- * Just give credits who put effort on this code
- *
- * "PICC" short for Proximity Integrated Circuit Card (RFID Tags)
- */
+/* E-RFIDDoorUnlocker
+*December, 2014 - Leandro Gomes da Silva, Pablo Antunes Silva, Lucas Cedro de Lima
+*
+*A simple solution to unlock the door using RFID tags and "authentication" over 
+*Internet. Hardware in use is a Galileo board which is compatible with Arduino uno.
+*
+*This project is based on Omer Siar Baysal RFID project 
+*https://github.com/omersiar/RFID522-Door-Unlock and also on Victor Hugo Montes 
+*Aldir Santos project using aJSON parser https://bitbucket.org/victoraldir/ajson-aviseja
+*
+*Hardware
+*We are using a Intel Galileo board. It already have Ethernet connection so we 
+*decided to communicate with the server through it. This project also uses a RFID-RC522
+*shield (Compatible with MIFARI tags) and a RGB LED to give some output for users.
+*
+*Web Interface
+*This project allows an Administrator of the system to associate one UID for each
+*user. As mentioned on Omer Siar Baysal project, it is still possible to create a 
+*master tag, but only if there is no UID on DB and a ADMIN user is lready defined. 
+*Web Interface was built using CakePHP and MYSql database.
+*
+*Security
+*We still lack security. All we do is allow user to open the door only if his tag 
+*UID is already associated to one user on database. It is also a problem whe the 
+*server returns a response. The response is always 0 or 1 in a JSON format without 
+*any encryption.
+*
+*Credits
+*Main code based on: RFID522 Door Unlock - Omer Siar Baysal 
+*https://github.com/omersiar/RFID522-Door-Unlock 
+*aJSON AviseJá - Victor Hugo Montes Aldir Santos 
+*https://bitbucket.org/victoraldir/ajson-aviseja
+*
+*aJSON Library https://github.com/interactive-matter/aJson
+*
+*MFRC522 Library https://github.com/miguelbalboa/rfid Based on code Dr.Leong 
+*( WWW.B2CQSHOP.COM ) Created by Miguel Balboa (circuitito.com), Jan, 2012. 
+*Rewritten by Søren Thing Andersen (access.thing.dk), fall of 2013 (Translation 
+*to English, refactored, comments, anti collision, cascade levels.)
+*
+*A BIG thanks to iMobilis (laboratory of mobile computing) at UFOP/ICEA for 
+*lending us the Galileo and the RFID shield. iMobilis http://www.decom.ufop.br/imobilis/ 
+*UFOP http://www.ufop.br/ UFOP/ICEA http://www.icea.ufop.br/
+*
+*License
+*Feel FREE to use this code as you want to. Just remember to give the correct credits.
+*/
 
-#include <EEPROM.h>  // We are going to read and write PICC's UIDs from/to EEPROM
 #include <SPI.h>      // RC522 Module uses SPI protocol
 #include <MFRC522.h>   // Library for Mifare RC522 Devices
 #include <Ethernet.h>
 #include <aJSON.h>
-
-/* Instead of a Relay maybe you want to use a servo
- * Servos can lock and unlock door locks too
- * There are examples out there.
- */
-
-// #include <Servo.h>
-
-/* For visualizing whats going on hardware
- * we need some leds and
- * to control door lock a relay and a wipe button
- * (or some other hardware)
- * Used common anode led,digitalWriting HIGH turns OFF led
- * Mind that if you are going to use common cathode led or
- * just seperate leds, simply comment out #define COMMON_ANODE,
- */
 
 // #define COMMON_ANODE
 
@@ -97,7 +65,7 @@
 #define greenLed 6
 #define blueLed 5
 #define relay 4
-#define wipeB 3 // Button pin for WipeMode
+#define buzzer 2 // Button pin for WipeMode
 
 #define CHECK_ALL 0
 #define CREATE_ONE 1
@@ -106,23 +74,20 @@
 #define CHECK_ONE_ASSOC 4
 #define CREATE_MASTER 5
 
-boolean match = false; // initialize card match to false
 boolean programMode = false; // initialize programming mode to false
 
 int successRead; // Variable integer to keep if we have Successful Read from Reader
 
-byte storedCard[4];   // Stores an ID read from EEPROM
-byte readCard[4];           // Stores scanned ID read from RFID Module
-char cardUID[10];
-byte masterCard[4]; // Stores master card's ID read from EEPROM
+byte readCard[4];// Stores scanned ID read from RFID Module
+char cardUID[10];// Stores scanned ID read from RFID Module in text mode
 
 /* We need to define MFRC522's pins and create instance
  * Pin layout should be as follows (on Arduino Uno):
- * MOSI: Pin 11 / ICSP-4
- * MISO: Pin 12 / ICSP-1
- * SCK : Pin 13 / ICSP-3
- * SS : Pin 10 (Configurable)
- * RST : Pin 9 (Configurable)
+ * MOSI   : Pin 11 / ICSP-4
+ * MISO   : Pin 12 / ICSP-1
+ * SCK    : Pin 13 / ICSP-3
+ * SDA/SS : Pin 10 (Configurable)
+ * RST    : Pin 9 (Configurable)
  * look MFRC522 Library for
  * pin configuration for other Arduinos.
  */
@@ -132,8 +97,8 @@ byte masterCard[4]; // Stores master card's ID read from EEPROM
 MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance.
 
 byte mac[] = {0x98, 0x4F, 0xEE, 0x01, 0x10, 0xE2 };
-char server[] = "192.168.1.70";
-IPAddress ip(192,168,1,177);
+char server[] = "192.168.2.31";
+IPAddress ip(192,168,2,177);
 
 EthernetClient client;
 
@@ -148,7 +113,8 @@ void setup() {
   pinMode(greenLed, OUTPUT);
   pinMode(blueLed, OUTPUT);
   pinMode(relay, OUTPUT);
-  digitalWrite(relay, HIGH); // Make sure door is locked
+  pinMode(buzzer, OUTPUT);
+  digitalWrite(relay, LOW); // Make sure door is locked
   digitalWrite(redLed, LED_OFF); // Make sure led is off
   digitalWrite(greenLed, LED_OFF); // Make sure led is off
   digitalWrite(blueLed, LED_OFF); // Make sure led is off
@@ -157,14 +123,9 @@ void setup() {
   Serial.begin(9600);    // Initialize serial communications with PC
   SPI.begin();           // MFRC522 Hardware uses SPI protocol
   mfrc522.PCD_Init();    // Initialize MFRC522 Hardware
-  mfrc522.PCD_SetAntennaGain(mfrc522.RxGain_max); //Set Antenna Gain to Max- this will increase reading distance
+  mfrc522.PCD_SetAntennaGain(mfroc522.RxGain_max); //Set Antenna Gain to Max- this will increase reading distance
 
-  // start the Ethernet connection:
-  // if (Ethernet.begin(mac) == 1) {
-  //   Serial.println("Failed to configure Ethernet using DHCP");
-    // no point in carrying on, so do nothing forevermore:
-    Ethernet.begin(mac,ip);
-  // }
+  Ethernet.begin(mac,ip); // Connect the server
 
   Serial.print("IP Address        : ");
   Serial.println(Ethernet.localIP());
@@ -174,11 +135,13 @@ void setup() {
   Serial.println(Ethernet.gatewayIP());
   Serial.print("DNS Server IP     : ");
   Serial.println(Ethernet.dnsServerIP());
+  Serial.println("");
   // give the Ethernet shield a second to initialize:
   delay(1000);
   
-  //TODO: Verificar se tem algúma tag no banco de dados. Se não tiver, cadastra a primeira como MASTER
-  if (query(CHECK_ALL, "")) {  // Look EEPROM if Master Card defined, EEPROM address 1 holds if defined
+  responseInit();
+  
+  if (query(CHECK_ALL, "")) {  // Look DB if Master Card defined
     Serial.println("No Master Card Defined");
     Serial.println("Scan A PICC to Define as Master Card");
     do {
@@ -189,16 +152,16 @@ void setup() {
       delay(200);
     }
     while (!successRead); //the program will not go further while you not get a successful read
-
+    responseSuccess();
+    //Next line convert byte tag ID to char tag ID
     sprintf(cardUID, "%02X%02X%02X%02X", readCard[0], readCard[1], readCard[2], readCard[3]);
-    query(CREATE_ONE, cardUID);
-    query(CREATE_MASTER, cardUID);
+    query(CREATE_ONE, cardUID); // Create tag in database
+    query(CREATE_MASTER, cardUID); // Set first user and first tag as master
     Serial.println("Master Card Defined"); 
   }
   Serial.println("##### RFID Door Acces Control v2.0.8 #####"); //For debug purposes
   Serial.println("");
   Serial.println("Waiting PICCs to bo scanned :)");
-  cycleLeds();    // Everything ready lets give user some feedback by cycling leds
 }
 
 
@@ -215,43 +178,47 @@ void loop () {
   }
   while (!successRead); //the program will not go further while you not get a successful read
   if (programMode) {
-    Serial.println("Cheking if is master on programMode");
+    cardReaded();
     if ( isMaster(readCard) ) {  //If master card scanned again exit program mode
       Serial.println("This is Master Card"); 
       Serial.println("Exiting Program Mode");
       Serial.println("-----------------------------");
+      responseSuccess();
       programMode = false;
       return;
     }
     else {  
-      if ( findID(readCard, CHECK_ONE) ) { //If scanned card is known delete it
+      if ( findID(readCard, CHECK_ONE) ) { //If scanned card is known, do nothing
+        responseFail();
         Serial.println("I know this PICC, so do nothing");
-        // deleteID(readCard);
         Serial.println("-----------------------------");
       }
       else {                    // If scanned card is not known add it
         Serial.println("I do not know this PICC, adding...");
         writeID(readCard);
+        responseSuccess();
         Serial.println("-----------------------------");
       }
     }
   }
   else {
-    Serial.println("Cheking if is master");
+    cardReaded();
     if ( isMaster(readCard) ) {  // If scanned card's ID matches Master Card's ID enter program mode
       programMode = true;
+      responseSuccess();
       Serial.println("Hello");
       Serial.println("Scan a PICC to ADD");
       Serial.println("-----------------------------");
     }
     else {
-      if ( findID(readCard, CHECK_ONE_ASSOC) ) {        // If not, see if the card is in the EEPROM 
+      if ( findID(readCard, CHECK_ONE_ASSOC) ) { // If not, see if the card is in the database 
         Serial.println("Welcome, You shall pass");
-        openDoor(300);                // Open the door lock for 300 ms
+        responseSuccess();
+        openDoor(500);// Open the door lock for 300 ms
       }
-      else {                // If not, show that the ID was not valid
+      else {// If not, show that the ID was not valid
         Serial.println("You shall not pass");
-        failed(); 
+        responseFail();
       }
     }
   }
@@ -279,31 +246,15 @@ int getID() {
   return 1;
 }
 
-///////////////////////////////////////// Cycle Leds (Program Mode) ///////////////////////////////////
-void cycleLeds() {
-  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
-  digitalWrite(greenLed, LED_ON); // Make sure green LED is on
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  delay(200);
-  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
-  digitalWrite(blueLed, LED_ON); // Make sure blue LED is on
-  delay(200);
-  digitalWrite(redLed, LED_ON); // Make sure red LED is on
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  delay(200);
-}
-
 //////////////////////////////////////// Normal Mode Led  ///////////////////////////////////
 void normalModeOn () {
   digitalWrite(blueLed, LED_ON); // Blue LED ON and ready to read card
   digitalWrite(redLed, LED_OFF); // Make sure Red LED is off
   digitalWrite(greenLed, LED_OFF); // Make sure Green LED is off
-  digitalWrite(relay, HIGH); // Make sure Door is Locked
+  digitalWrite(relay, LOW); // Make sure Door is Locked
 }
 
-///////////////////////////////////////// Add ID to EEPROM   ///////////////////////////////////
+///////////////////////////////////////// Add ID to database   ///////////////////////////////////
 boolean writeID( byte a[] ) {
   sprintf(cardUID, "%02X%02X%02X%02X", a[0], a[1], a[2], a[3]);
   if(query(CREATE_ONE, cardUID)){
@@ -312,7 +263,7 @@ boolean writeID( byte a[] ) {
   return false;
 }
 
-///////////////////////////////////////// Find ID From EEPROM   ///////////////////////////////////
+///////////////////////////////////////// Find ID on database   ///////////////////////////////////
 boolean findID(byte find[], int op) {
   sprintf(cardUID, "%02X%02X%02X%02X", find[0], find[1], find[2], find[3]);
 
@@ -332,66 +283,6 @@ boolean findID(byte find[], int op) {
   return false;
 }
 
-///////////////////////////////////////// Write Success to EEPROM   ///////////////////////////////////
-// Flashes the green LED 3 times to indicate a successful write to EEPROM
-void successWrite() {
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is on
-  delay(200);
-  digitalWrite(greenLed, LED_ON); // Make sure green LED is on
-  delay(200);
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
-  delay(200);
-  digitalWrite(greenLed, LED_ON); // Make sure green LED is on
-  delay(200);
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
-  delay(200);
-  digitalWrite(greenLed, LED_ON); // Make sure green LED is on
-  delay(200);
-  Serial.println("Succesfully added ID record to EEPROM");
-}
-
-///////////////////////////////////////// Write Failed to EEPROM   ///////////////////////////////////
-// Flashes the red LED 3 times to indicate a failed write to EEPROM
-void failedWrite() {
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
-  delay(200);
-  digitalWrite(redLed, LED_ON); // Make sure red LED is on
-  delay(200);
-  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
-  delay(200);
-  digitalWrite(redLed, LED_ON); // Make sure red LED is on
-  delay(200);
-  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
-  delay(200);
-  digitalWrite(redLed, LED_ON); // Make sure red LED is on
-  delay(200);
-  Serial.println("Failed! There is something wrong with ID or bad EEPROM");
-}
-
-///////////////////////////////////////// Success Remove UID From EEPROM  ///////////////////////////////////
-// Flashes the blue LED 3 times to indicate a success delete to EEPROM
-void successDelete() {
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
-  delay(200);
-  digitalWrite(blueLed, LED_ON); // Make sure blue LED is on
-  delay(200);
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  delay(200);
-  digitalWrite(blueLed, LED_ON); // Make sure blue LED is on
-  delay(200);
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  delay(200);
-  digitalWrite(blueLed, LED_ON); // Make sure blue LED is on
-  delay(200);
-  Serial.println("Succesfully removed ID record from EEPROM");
-}
-
 ////////////////////// Check readCard IF is masterCard   ///////////////////////////////////
 // Check to see if the ID passed is the master programing card
 boolean isMaster( byte test[] ) {
@@ -408,18 +299,12 @@ void openDoor( int setDelay ) {
   digitalWrite(blueLed, LED_OFF); // Turn off blue LED
   digitalWrite(redLed, LED_OFF); // Turn off red LED    
   digitalWrite(greenLed, LED_ON); // Turn on green LED
-  digitalWrite(relay, LOW); // Unlock door!
+  digitalWrite(relay, HIGH); // Unlock door!
   delay(setDelay); // Hold door lock open for given seconds
-  digitalWrite(relay, HIGH); // Relock door
+  digitalWrite(relay, LOW); // Relock door
   delay(2000); // Hold green LED on for 2 more seconds
-}
-
-///////////////////////////////////////// Failed Access  ///////////////////////////////////
-void failed() {
-  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
-  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
-  digitalWrite(redLed, LED_ON); // Turn on red LED
-  delay(1200);
+  digitalWrite(greenLed, LED_OFF);
+  digitalWrite(blueLed, LED_ON);
 }
 
 String requestServer(int code, char uid[]) {
@@ -431,7 +316,7 @@ String requestServer(int code, char uid[]) {
   if (client.connect(server, 80)) {
     Serial.println("connected");
     // Make a HTTP request:
-    client.print("GET /secdoorlock/operations.php?cod=");
+    client.print("GET /nfc/operations.php?cod=");
     client.print(code);
     client.print("&tag=");
     client.print(uid);
@@ -503,4 +388,86 @@ boolean query(int code, char uid[]) {
       jsonString = "";
   }
   return status;
+}
+
+///////////////////////////////////////// Cycle Leds (Program Mode) ///////////////////////////////////
+void cycleLeds() {
+  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
+  digitalWrite(greenLed, LED_ON); // Make sure green LED is on
+  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
+  delay(200);
+  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
+  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
+  digitalWrite(blueLed, LED_ON); // Make sure blue LED is on
+  delay(200);
+  digitalWrite(redLed, LED_ON); // Make sure red LED is on
+  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
+  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
+  delay(200);
+}
+
+void cardReaded() {
+  digitalWrite(blueLed, LED_ON);
+  delay(200);
+  digitalWrite(blueLed, LED_OFF);
+  tone(buzzer,500);
+  delay(200);
+  digitalWrite(blueLed, LED_ON);
+  tone(buzzer,1500);
+  delay(200);
+  noTone(buzzer);
+}
+
+void responseInit() {
+  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
+  digitalWrite(greenLed, LED_ON); // Make sure green LED is on
+  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
+  tone(buzzer,500);   
+  delay(200);
+  noTone(buzzer);
+  delay(200);
+  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
+  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
+  digitalWrite(blueLed, LED_ON); // Make sure blue LED is on
+  tone(buzzer,1000);   
+  delay(200);
+  noTone(buzzer);
+  delay(200);
+  tone(buzzer,1500);   
+  delay(200);
+  digitalWrite(redLed, LED_ON); // Make sure red LED is on
+  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
+  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
+  tone(buzzer,2000);   
+  delay(200);
+  tone(buzzer,500);   
+  delay(200);
+  noTone(buzzer);
+  digitalWrite(redLed, LED_OFF);
+}
+
+void responseFail() {
+  digitalWrite(redLed, LED_ON); // Make sure red LED is on
+  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
+  digitalWrite(blueLed, LED_OFF); // Make sure blue LED is off
+  tone(buzzer,500);   
+  delay(1500);
+  noTone(buzzer);
+  digitalWrite(redLed, LED_OFF); // Make sure red LED is off
+  digitalWrite(greenLed, LED_OFF); // Make sure green LED is off
+  digitalWrite(blueLed, LED_ON); // Make sure blue LED is on
+}
+
+void responseSuccess() {
+  digitalWrite(redLed, LED_OFF);
+  digitalWrite(greenLed, LED_ON);
+  digitalWrite(blueLed, LED_OFF);
+  tone(buzzer,1500);   
+  delay(200);
+  noTone(buzzer);
+  delay(200);
+  tone(buzzer,1500);   
+  delay(200);
+  noTone(buzzer);
+  digitalWrite(greenLed, LED_OFF);
 }
