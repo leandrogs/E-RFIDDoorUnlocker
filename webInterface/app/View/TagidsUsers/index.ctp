@@ -3,7 +3,6 @@
 	<table cellpadding="0" cellspacing="0">
 	<thead>
 	<tr>
-			<th><?php echo $this->Paginator->sort('id'); ?></th>
 			<th><?php echo $this->Paginator->sort('tagid_id'); ?></th>
 			<th><?php echo $this->Paginator->sort('user_id'); ?></th>
 			<th><?php echo $this->Paginator->sort('created'); ?></th>
@@ -14,12 +13,11 @@
 	<tbody>
 	<?php foreach ($tagidsUsers as $tagidsUser): ?>
 	<tr>
-		<td><?php echo h($tagidsUser['TagidsUser']['id']); ?>&nbsp;</td>
 		<td>
-			<?php echo $this->Html->link($tagidsUser['Tagid']['id'], array('controller' => 'tagids', 'action' => 'view', $tagidsUser['Tagid']['id'])); ?>
+			<?php echo $this->Html->link($tagidsUser['Tagid']['tagid'], array('controller' => 'tagids', 'action' => 'view', $tagidsUser['Tagid']['id'])); ?>
 		</td>
 		<td>
-			<?php echo $this->Html->link($tagidsUser['User']['id'], array('controller' => 'users', 'action' => 'view', $tagidsUser['User']['id'])); ?>
+			<?php echo $this->Html->link($tagidsUser['User']['username'], array('controller' => 'users', 'action' => 'view', $tagidsUser['User']['id'])); ?>
 		</td>
 		<td><?php echo h($tagidsUser['TagidsUser']['created']); ?>&nbsp;</td>
 		<td><?php echo h($tagidsUser['TagidsUser']['modified']); ?>&nbsp;</td>

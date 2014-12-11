@@ -102,6 +102,16 @@ p {
 	color: #af141d;
 }
 
+.username{
+	color: #af141d;
+	font-size: 18px;
+	font-weight: bold;
+}
+
+.welcome{
+	font-size: 18px;
+}
+
 #content{
 	background: #fff;
 	clear: both;

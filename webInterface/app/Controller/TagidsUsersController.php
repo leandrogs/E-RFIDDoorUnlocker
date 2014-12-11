@@ -47,6 +47,8 @@ class TagidsUsersController extends AppController {
  */
 	public function add() {
 		if ($this->request->is('post')) {
+
+			// debug($this->request->data) or die();
 			$this->TagidsUser->create();
 			if ($this->TagidsUser->save($this->request->data)) {
 				$this->Session->setFlash(__('The tagids user has been saved.'));
@@ -55,8 +57,10 @@ class TagidsUsersController extends AppController {
 				$this->Session->setFlash(__('The tagids user could not be saved. Please, try again.'));
 			}
 		}
-		$tagids = $this->TagidsUser->Tagid->find('list');
-		$users = $this->TagidsUser->User->find('list');
+		$tagids = $this->TagidsUser->Tagid->find('list', array('recursive' => -1,
+															  'fields' => array('Tagid.id', 'Tagid.tagid') ));
+		$users = $this->TagidsUser->User->find('list', array('recursive' => -1,
+															  'fields' => array('User.id', 'User.username') ));
 		$this->set(compact('tagids', 'users'));
 	}
 

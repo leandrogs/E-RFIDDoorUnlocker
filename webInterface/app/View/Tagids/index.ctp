@@ -1,5 +1,5 @@
 <div class="tagids index">
-	<h2><?php echo __('Tagids'); ?></h2>
+	<h2><?php echo __('Tags'); ?></h2>
 	<table cellpadding="0" cellspacing="0">
 	<thead>
 	<tr>
@@ -48,4 +48,3 @@
 		<li><?php echo $this->Html->link(__('Novo Usuário'), array('controller' => 'users', 'action' => 'add')); ?> </li>
 	</ul>
 </div>
-s
